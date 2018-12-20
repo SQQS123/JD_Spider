@@ -1,4 +1,5 @@
 # coding=utf8
+import pymysql
 import json
 import requests
 from bs4 import BeautifulSoup as bs
@@ -17,12 +18,20 @@ def get_http_response(url,params=None):
 
 cate_url = "https://list.jd.com/list.html?cat=9987,653,655"
 cate_response = get_http_response(cate_url)
+cate_values = []
 
 # 打开浏览器，为了价格
 index = 0
 browser = webdriver.PhantomJS()
 browser.get(cate_url)
 price = browser.find_elements_by_xpath("//strong[@class='J_price']")
+
+# 将数据保存到数据库
+# 连接数据库
+mysql = pymysql.connect(host="localhost", user="root", passwd="123456", db="jd", charset="utf8")
+
+# 获取操作游标
+cur = mysql.cursor()
 
 # print(cate_response.text)
 if cate_response.status_code == 200:
@@ -32,12 +41,12 @@ if cate_response.status_code == 200:
 	# 这样我们就直接得到了所有的商品的栏目
 	for box in box_list:
 		# print(box)
-		
+
 		# 得到商品详情页的完整url
 		info_url ='https:' + box.select_one("a").attrs["href"]
 		goods['info_url'] = info_url
 		print("商品详情:"+info_url)
-		
+
 		# 得到这个对象的一些方法,相当于help(obj),编程看手册
 		# print(dir(box.select_one("img")))
 		# 得到图片的完整路径
@@ -49,18 +58,22 @@ if cate_response.status_code == 200:
 		img_url = 'https:' + img_url
 		goods['img_url'] = img_url
 		print("图片链接:"+img_url)
-		
+
 		# 得到商品的标题
 		# 通过选择em得到标题的em的序号，然后选择它
 		title = box.select("em")[2].text.strip()
 		goods['title'] = title
 		print("商品标题:"+title)
-		
+
 		# 得到商品的价格,我打算用selenium
 		# 通过打开PhantomJS浏览器得到
-		goods['price'] = price[index].text
-		print("商品价格"+price[index].text)
-		
+		price_value = price[index].text
+		goods['price'] = price_value
+		print("商品价格:"+price_value)
+
+		# 将字典添加到列表中，再写入mysql
+		cate_values.append(goods)
+
 		# 如果下面不加'utf-8'的话会报错,报错内容大概是下面的
 		# 某个gbk无法解码
 		# 所以解决方式就是加encoding='utf-8'和ensure_ascii=False
@@ -69,3 +82,17 @@ if cate_response.status_code == 200:
 		with open('f:\\JD\\jd_goods.txt','a',encoding='utf-8') as f:
 			f.writelines(json.dumps(goods,ensure_ascii=False) + '\n')
 		index += 1
+
+
+		# 尝试写入数据库
+		# 3. execute SQL command
+		sql = "insert into jd_goods(info_url,img_url,title,price) values('"+ info_url +"','"+ img_url + "','" + title + "','" + price_value + "')"
+		print('sql = %s' % sql)
+
+		try:
+			cur.execute(sql)
+			mysql.commit()
+		except:
+			print("失败")
+			mysql.rollback()
+
