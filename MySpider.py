@@ -60,6 +60,12 @@ if cate_response.status_code == 200:
 		# 通过打开PhantomJS浏览器得到
 		goods['price'] = price[index].text
 		print("商品价格"+price[index].text)
+		
+		# 如果下面不加'utf-8'的话会报错,报错内容大概是下面的
+		# 某个gbk无法解码
+		# 所以解决方式就是加encoding='utf-8'和ensure_ascii=False
+		# json.dumps序列化时默认使用的ascii编码，想输出真正的中文需要指定ensure_ascii=False
+		# 而将文件写入时默认使用的是gbk，所以我们需要encoding='utf-8'
 		with open('f:\\JD\\jd_goods.txt','a',encoding='utf-8') as f:
 			f.writelines(json.dumps(goods,ensure_ascii=False) + '\n')
 		index += 1
